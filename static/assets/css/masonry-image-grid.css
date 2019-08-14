@@ -1,0 +1,8 @@
+/* center container with CSS */
+#img-grid {
+    margin: 0 auto;
+}
+
+.grid-sizer, .grid-item {
+    margin-bottom: 10px;
+}
