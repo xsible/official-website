@@ -1,21 +1,25 @@
 import os
+from io import BytesIO
+import base64
+import sys
+
 from flask import Flask, render_template, escape, send_from_directory, request, jsonify
 from werkzeug import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from PIL import Image
-from io import BytesIO
-import base64
 import numpy as np
 import cv2
 
-# we have to load the model here in order for inference
-# from inference import run_inference
-# predict_simple = run_inference('custom.pth')
+
+sys.path.append('ssd_pytorch')
+from ssd_pytorch.inference import run_inference
+predict_simple = None
+
 
 SAVE_DATA = False
 INPUT_IMG_PATH = 'static/images/input/'
-OUTPUT_IMG_PATH = 'static/images/output'
+OUTPUT_IMG_PATH = 'static/images/output/'
 
 def cv2_img_from_upload(req_file):
     req_file.stream.seek(0) # return to the start of the stream
@@ -32,7 +36,6 @@ def base64_from_numpy_img(img):
     rawBytes.seek(0)  # return to the start of the file
 
     base64img = base64.encodestring(rawBytes.read())
-    print(base64img.decode().replace('\n', ''))
     return base64img.decode().replace('\n', '')
 
 app = Flask(__name__, static_folder='static')
@@ -72,14 +75,15 @@ def upload_file():
             input_path = os.path.join(INPUT_IMG_PATH, sfname)
             file.save(input_path)
 
-        # output_img, pts = predict_simple(input_path)
+        input_img = cv2_img_from_upload(file)
+        output_img, pts = predict_simple(input_img)
 
         if SAVE_DATA:
             output_path = os.path.join(OUTPUT_IMG_PATH, f"{sfname.split('.')[0]}-output.jpg")
             cv2.imwrite(output_path, output_img)
 
         return jsonify({
-            'base64': base64_from_numpy_img(cv2_img_from_upload(file))
+            'base64': base64_from_numpy_img(output_img)
         })
 
 if __name__ == '__main__':
@@ -89,4 +93,5 @@ if __name__ == '__main__':
         if not os.path.exists(OUTPUT_IMG_PATH):
             os.makedirs(OUTPUT_IMG_PATH)
 
+    predict_simple = run_inference('model/custom.pth', cuda=False)
     app.run(debug=True, port=5000)
